@@ -95,13 +95,6 @@ struct sync_file *sync_file_create(struct fence *fence)
 }
 EXPORT_SYMBOL(sync_file_create);
 
-/**
- * sync_file_fdget() - get a sync_file from an fd
- * @fd:		fd referencing a fence
- *
- * Ensures @fd references a valid sync_file, increments the refcount of the
- * backing file. Returns the sync_file or NULL in case of error.
- */
 struct sync_file *sync_file_fdget(int fd)
 {
 	struct file *file = fget(fd);
