@@ -86,6 +86,9 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#ifdef CONFIG_KAISER
+#include <asm/kaiser.h>
+#endif
 
 #ifdef CONFIG_SEC_EXT
 #include <linux/sec_ext.h>
@@ -537,6 +540,9 @@ static void __init mm_init(void)
 	ioremap_huge_init();
 #ifdef CONFIG_PTRACK_DEBUG
 	ptrack_init();
+#endif
+#ifdef CONFIG_KAISER
+	kaiser_init();
 #endif
 }
 
