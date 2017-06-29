@@ -96,9 +96,8 @@ struct sync_timeline *sync_timeline_create(const char *name)
 	obj->context = fence_context_alloc(1);
 	strlcpy(obj->name, name, sizeof(obj->name));
 
-	INIT_LIST_HEAD(&obj->child_list_head);
-	INIT_LIST_HEAD(&obj->active_list_head);
-	spin_lock_init(&obj->child_list_lock);
+	INIT_LIST_HEAD(&obj->pt_list);
+	spin_lock_init(&obj->lock);
 
 	sync_timeline_debug_add(obj);
 
@@ -141,17 +140,15 @@ void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 
 	trace_sync_timeline(obj);
 
-	spin_lock_irq(&obj->child_list_lock);
+	spin_lock_irq(&obj->lock);
 
 	obj->value += inc;
 
-	list_for_each_entry_safe(pt, next, &obj->active_list_head,
-				 active_list) {
+	list_for_each_entry_safe(pt, next, &obj->pt_list, link)
 		if (fence_is_signaled_locked(&pt->base))
-			list_del_init(&pt->active_list);
-	}
+			list_del_init(&pt->link);
 
-	spin_unlock_irq(&obj->child_list_lock);
+	spin_unlock_irq(&obj->lock);
 }
 EXPORT_SYMBOL(sync_timeline_signal);
 
@@ -174,15 +171,15 @@ struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 	if (!pt)
 		return NULL;
 
-	spin_lock_irq(&obj->child_list_lock);
-
 	sync_timeline_get(obj);
-	fence_init(&pt->base, &timeline_fence_ops, &obj->child_list_lock,
+	fence_init(&pt->base, &timeline_fence_ops, &obj->lock,
 		   obj->context, value);
-	list_add_tail(&pt->child_list, &obj->child_list_head);
-	INIT_LIST_HEAD(&pt->active_list);
+	INIT_LIST_HEAD(&pt->link);
 
-	spin_unlock_irq(&obj->child_list_lock);
+	spin_lock_irq(&obj->lock);
+	if (!fence_is_signaled_locked(&pt->base))
+		list_add_tail(&pt->link, &obj->pt_list);
+	spin_unlock_irq(&obj->lock);
 
 	return pt;
 }
@@ -205,15 +202,15 @@ static void timeline_fence_defer_release(struct work_struct *wq)
 	struct sync_pt *pt = container_of(wq, struct sync_pt, defer_wq);
 	struct fence *fence = &pt->base;
 	struct sync_timeline *parent = fence_parent(fence);
-	unsigned long flags;
 
-	spin_lock_irqsave(fence->lock, flags);
+	if (!list_empty(&pt->link)) {
+		unsigned long flags;
 
-	list_del(&pt->child_list);
-	if (!list_empty(&pt->active_list))
-		list_del(&pt->active_list);
-
-	spin_unlock_irqrestore(fence->lock, flags);
+		spin_lock_irqsave(fence->lock, flags);
+		if (!list_empty(&pt->link))
+			list_del(&pt->link);
+		spin_unlock_irqrestore(fence->lock, flags);
+	}
 
 	sync_timeline_put(parent);
 	fence_free(fence);
@@ -237,13 +234,6 @@ static bool timeline_fence_signaled(struct fence *fence)
 
 static bool timeline_fence_enable_signaling(struct fence *fence)
 {
-	struct sync_pt *pt = fence_to_sync_pt(fence);
-	struct sync_timeline *parent = fence_parent(fence);
-
-	if (timeline_fence_signaled(fence))
-		return false;
-
-	list_add_tail(&pt->active_list, &parent->active_list_head);
 	return true;
 }
 
