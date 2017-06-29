@@ -158,7 +158,6 @@ EXPORT_SYMBOL(sync_timeline_signal);
 /**
  * sync_pt_create() - creates a sync pt
  * @parent:	fence's parent sync_timeline
- * @size:	size to allocate for this pt
  * @inc:	value of the fence
  *
  * Creates a new sync_pt as a child of @parent.  @size bytes will be
@@ -171,10 +170,7 @@ struct sync_pt *sync_pt_create(struct sync_timeline *obj, int size,
 {
 	struct sync_pt *pt;
 
-	if (size < sizeof(*pt))
-		return NULL;
-
-	pt = kzalloc(size, GFP_KERNEL);
+	pt = kzalloc(sizeof(*pt), GFP_KERNEL);
 	if (!pt)
 		return NULL;
 
@@ -334,7 +330,7 @@ static long sw_sync_ioctl_create_fence(struct sync_timeline *obj,
 		goto err;
 	}
 
-	pt = sync_pt_create(obj, sizeof(*pt), data.value);
+	pt = sync_pt_create(obj, data.value);
 	if (!pt) {
 		err = -ENOMEM;
 		goto err;
