@@ -80,15 +80,13 @@
 #include <linux/integrity.h>
 #include <linux/proc_ns.h>
 #include <linux/io.h>
+#include <linux/kaiser.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
-#ifdef CONFIG_KAISER
-#include <asm/kaiser.h>
-#endif
 
 #ifdef CONFIG_SEC_EXT
 #include <linux/sec_ext.h>
@@ -541,9 +539,7 @@ static void __init mm_init(void)
 #ifdef CONFIG_PTRACK_DEBUG
 	ptrack_init();
 #endif
-#ifdef CONFIG_KAISER
 	kaiser_init();
-#endif
 }
 
 #ifdef CONFIG_UH_RKP
