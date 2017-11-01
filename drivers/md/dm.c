@@ -2530,7 +2530,7 @@ struct mapped_device *dm_get_from_kobject(struct kobject *kobj)
 	dm_get(md);
 out:
 	spin_unlock(&_minor_lock);
-	
+
 	return md;
 }
 
